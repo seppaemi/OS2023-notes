@@ -119,6 +119,8 @@ To remain sound alongside core OS goals like security and isolation, signals can
 
 [link to chapter 9](http://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched-lottery.pdf)
 
+[link to chapter 10](https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched-multi.pdf)
+
 ## Mechanism: limited direct execution
 
 CPU virtualization is achieved through _time sharing_; a process is run for a bit, then swapped out etc. The OS must do this while maintaining high _performance_ and full _control_.
@@ -362,4 +364,68 @@ balance. This is implemented with _work stealing_, where queues peek at others
 and take jobs from them if they are significantly less full. Naturally, there's
 a tradeoff between the overhead of checking queues frequently and not checking
 frequently enough.
+
+### Quick notes chapter 7
+
+- This is the high level part
+- The chapter makes unrealistic assumptions
+    1. All jobs run for the same time
+    2. And arrive the same time
+    3. And run continuously
+    4. They use the CPU (no I/O)
+    5. We know the fun time upfront
+- We also need some metrics
+    - turnaround time
+    - Fairness
+    - Tese are at odds with eachother
+- With these assumptions FIFO works
+- If we relax assumption 1, then it is bad
+- So we do SJF
+- But if we relax assumption 4, then it is bad
+- We need to relax assumption 3
+- We do STCF to interrupt the first really long job if we get incoming short jobs
+- We need to then take response time into account, because computers are interactive
+_ RR (round robin). We have a time-slice and rotate between them. The overhead is the time it takes for contexr switching
+- Fair and turnaround metrics are opposite
+
+### Quick notes chapter 8
+
+- Crux: minimize response time and turnaround tome, without any oracle
+- Priority rules:
+    1. If P(A) > P(B), A runs and B doesn't
+    2. If P(A) = P(B), A and B run in RR using the time slice
+    3. When a new job comes in, it gets highest priority
+    4. Once a job uses its time allotment at a level, it's priority is reduces; this is done regardless of how many times it's given up the CPU to do I/O, to prevent gaming the system
+    5. after some time perios, all jobs are moved back up to the top of the queue
+- BSD Unix, solaris, and windows post-NT use a form of MLQ
+
+### Quick notes chapter 9
+
+- Fair share scheduler
+- Tickets represent the share of the scheduler you get
+- We could do this randomly using a lottery
+- Deterministic option: Stride scheduling
+- Linx CFS; completely fair scheduler uses `vruntime`, virual runtime. Processes gain this the longer they run. The system picks the one with the lowest to run
+- Control parameters; `sched_latency`, `min_granularity`, `nice` level per process. The lower the nice level, the higher the priority (-20 to +19)
+- jobs that do a lot of I/O may get screwed out of enough runtime
+
+### Quick notes chapter 10
+
+- 1 CPU: There is a memory cache that lives by the CPU and contains popular data
+- Multiple CPUs: There’s a bus connecting the two CPUs, each of which has their own cache.
+- Now we have to worry about cache coherence - suppose you cache a piece of data D on CPU 1 but then it resumes on CPU 2 - oh no!
+- To make the “right thing” happen we can use “bus snooping” to invalidate or update the other copy
+- Yes, we have to worry about synchronization too - locks are needed.
+- Cache affinity - we’d like to keep things running on the same processor for better performance
+- Version 1. SQMS aka “Single Queue Multiprocessor Scheduling” - make one queue for all CPUs.
+    - Advantage: Simplicity!
+    - Disadvantage: Reduces performance due to synchronization overheads from locking
+    - Disadvantage: Bad cache affinity
+- Version 2. MQMS aka “Multi-queue Multiprocessor Scheduling”
+    - Scalable!
+    - Cache affinity!
+    - Introduces a problem of load balancing.
+    - We need to migrate jobs around, one approach is known as “work stealing,” and we need to balance how much you peek at the other queues with how much that affects your processing power
+    - This is a black art
+- Linux has three: O(1) scheduler, Completely Fair Scheduler (CFS), and BFS
 
